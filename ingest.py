@@ -1,40 +1,43 @@
 import os
-import requests
 import argparse
+from datasets import load_dataset
 
-def download_data(url, save_folder, filename):
-    # Ensure the save folder exists
-    if not os.path.exists(save_folder):
-        os.makedirs(save_folder)
-    
-    # Define the file path
-    file_path = os.path.join(save_folder, filename)
-    
-    try:
-        # Send a GET request to download the data
-        response = requests.get(url, stream=True)
-        response.raise_for_status()  # Check for request errors
-        
-        # Write the content to a file
-        with open(file_path, 'wb') as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                file.write(chunk)
-        
-        print(f"Data successfully downloaded and saved to {file_path}")
-    except requests.exceptions.RequestException as e:
-        print(f"Error downloading data: {e}")
+def download_data(save_dir="data"):
+    """
+    Downloads the PUBHEALTH dataset from Hugging Face and saves it locally.
+
+    Parameters:
+    - save_dir (str): The directory where the dataset will be saved. Defaults to 'data'.
+    """
+    # Load the PUBHEALTH dataset
+    print("Loading the PUBHEALTH dataset...")
+    dataset = load_dataset("ImperialCollegeLondon/health_fact")
+
+    # Ensure the save directory exists
+    os.makedirs(save_dir, exist_ok=True)
+
+    # Save the dataset to the specified directory
+    print(f"Saving the dataset to {save_dir}...")
+    for split in dataset.keys():
+        file_path = os.path.join(save_dir, f"pubhealth_{split}.jsonl")
+        dataset[split].to_json(file_path)
+        print(f"Saved {split} split to {file_path}")
+
+    print("Download and save complete.")
 
 def main():
-    # Set up argument parser
-    parser = argparse.ArgumentParser(description="Download data and save it to a specified folder.")
-    parser.add_argument("--url", type=str, required=True, help="URL of the data to download")
-    parser.add_argument("--folder", type=str, default="data", help="Folder where the data should be saved (default: 'data')")
-    parser.add_argument("--filename", type=str, default="datafile", help="Name of the file to save (default: 'datafile')")
-    
+    # Set up argument parsing
+    parser = argparse.ArgumentParser(description="Download and save the PUBHEALTH dataset.")
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        default="data",
+        help="The directory where the dataset will be saved. Defaults to 'data'."
+    )
     args = parser.parse_args()
-    
-    # Download the data
-    download_data(args.url, args.folder, args.filename)
+
+    # Download the dataset and save it to the specified directory
+    download_data(save_dir=args.save_dir)
 
 if __name__ == "__main__":
     main()
