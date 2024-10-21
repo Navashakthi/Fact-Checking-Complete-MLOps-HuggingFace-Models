@@ -9,9 +9,9 @@ def download_data(save_dir="data"):
     Parameters:
     - save_dir (str): The directory where the dataset will be saved. Defaults to 'data'.
     """
-    # Load the PUBHEALTH dataset
+    # Load the PUBHEALTH dataset with trust_remote_code set to True
     print("Loading the PUBHEALTH dataset...")
-    dataset = load_dataset("ImperialCollegeLondon/health_fact")
+    dataset = load_dataset("ImperialCollegeLondon/health_fact", trust_remote_code=True)
 
     # Ensure the save directory exists
     os.makedirs(save_dir, exist_ok=True)
