@@ -1,86 +1,97 @@
-import os
+# Import necessary libraries
 import pandas as pd
-from datasets import Dataset
+import numpy as np
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
+from datasets import load_dataset, Dataset
+import pandas as pd
+from sklearn.model_selection import train_test_split
+import torch
 
-def load_data(file_path):
-    """
-    Loads the prepared PUBHEALTH dataset from a CSV file and converts it into a Hugging Face Dataset.
 
-    Parameters:
-    - file_path (str): The path to the CSV file containing the dataset.
+pubhealth_df = pd.read_csv('/content/processed_data/pubhealth_train.csv')
 
-    Returns:
-    - Dataset: A Hugging Face Dataset object.
-    """
-    # Load the CSV file using pandas
-    df = pd.read_csv(file_path)
+def clean_text(text_list):
+    cleaned_list = []
+    for text in text_list:
+        # Check if the text is a string, if not, convert it to string
+        if isinstance(text, float):
+            # Skip NaN or None values (optional: replace with a placeholder)
+            continue
+        if not isinstance(text, str):
+            text = str(text)
+        cleaned_text = text.replace('\xa0', ' ').strip()
+        cleaned_list.append(cleaned_text)
+    return cleaned_list
 
-    # Map labels to numeric values (true, false, unproven, mixture -> 0, 1, 2, 3)
-    label_mapping = {"true": 0, "false": 1, "unproven": 2, "mixture": 3}
-    df['label'] = df['label'].map(label_mapping)
+def apply_clean_text(df):
+    # Drop rows with NaN values in the 'cleaned_claim' column
+    df_cleaned = df.dropna(subset=['cleaned_claim']).copy()
 
-    # Convert the DataFrame to a Hugging Face Dataset
-    dataset = Dataset.from_pandas(df)
-    return dataset
+    # Apply the clean_text function to the 'cleaned_claim' column using list comprehension
+    df_cleaned['cleaned_claim'] = clean_text(df_cleaned['cleaned_claim'].tolist())
 
-def tokenize_function(examples):
-    """
-    Tokenizes the input examples using a pre-trained tokenizer.
+    # Replace the original dataframe's cleaned_claim column with the cleaned data while maintaining the original indices
+    df.update(df_cleaned)
 
-    Parameters:
-    - examples (dict): A dictionary containing input text fields.
+    # Drop rows where the 'cleaned_claim' column might still be empty or contain NaN
+    df = df.dropna(subset=['cleaned_claim'])
 
-    Returns:
-    - dict: Tokenized examples with input IDs and attention masks.
-    """
-    return tokenizer(examples["claim"], truncation=True, padding="max_length", max_length=128)
+    return df
 
-def main(data_file, model_name="austinmw/distilbert-base-uncased-finetuned-health_facts", output_dir="model_output"):
-    # Load the tokenizer and model
-    global tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=4)
+df = apply_clean_text(pubhealth_df)
+X = list(df['cleaned_claim'])
+y = list(df['label'])
 
-    # Load and tokenize the dataset
-    dataset = load_data(data_file)
-    tokenized_dataset = dataset.map(tokenize_function, batched=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.20, random_state = 0)
 
-    # Set training arguments
-    training_args = TrainingArguments(
-        output_dir=output_dir,
-        evaluation_strategy="epoch",
-        learning_rate=2e-5,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
-        num_train_epochs=3,
-        weight_decay=0.01,
-        logging_dir="./logs",
-        logging_steps=10,
-        save_total_limit=2,
-        load_best_model_at_end=True,
-        metric_for_best_model="accuracy",
-    )
 
-    # Initialize Trainer
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=tokenized_dataset,
-        eval_dataset=tokenized_dataset,  # Typically, you'd use a validation set here.
-        tokenizer=tokenizer,
-    )
+train_df, val_df = train_test_split(df, test_size=0.2, random_state=42)
+# Check for any -1 labels and remove them if necessary
+train_df = train_df[train_df['label'] >= 0]
+val_df = val_df[val_df['label'] >= 0]
 
-    # Train the model
-    print("Starting training...")
-    trainer.train()
+# Convert the training and validation dataframes to Hugging Face datasets
+train_dataset = Dataset.from_pandas(train_df)
+val_dataset = Dataset.from_pandas(val_df)
 
-    # Save the final model
-    trainer.save_model(output_dir)
-    tokenizer.save_pretrained(output_dir)
-    print(f"Model saved to {output_dir}")
+# Load pre-trained tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained("austinmw/distilbert-base-uncased-finetuned-health_facts")
+model = AutoModelForSequenceClassification.from_pretrained("austinmw/distilbert-base-uncased-finetuned-health_facts")
 
-if __name__ == "__main__":
-    # Example usage: train_model.py --data_file processed_data/pubhealth_train.csv
-    data_file = "processed_data/pubhealth_train.csv"
-    main(data_file)
+# Tokenize the dataset
+def tokenize_function(texts):
+    return tokenizer(texts['cleaned_claim'], padding="max_length", truncation=True)
+
+train_dataset = train_dataset.map(tokenize_function, batched=True)
+val_dataset = val_dataset.map(tokenize_function, batched=True)
+
+# Set the format to PyTorch tensors
+train_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
+val_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
+
+training_args = TrainingArguments(
+    output_dir='./results',
+    evaluation_strategy="epoch",
+    save_strategy="epoch",
+    learning_rate=2e-5,
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+    num_train_epochs=1,
+    weight_decay=0.01,
+    load_best_model_at_end=True
+)
+
+# Create Trainer instance
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=val_dataset
+)
+
+# Train the model
+trainer.train()
+
+# Save the fine-tuned model
+model.save_pretrained('./fine-tuned-model')
+tokenizer.save_pretrained('./fine-tuned-model')
