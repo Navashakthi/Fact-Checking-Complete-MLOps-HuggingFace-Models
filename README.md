@@ -23,7 +23,11 @@ git clone https://github.com/Navashakthi/Fact-Checking-Complete-MLOps-using-Hugg
 cd Fact-Checking-Complete-MLOps-using-HuggingFace-Models
 ```
 
-#### 2. Install Dependencies
+#### 2. Follow Execution.ipynb
+
+Follow the implementation done in the notebook that includes the following steps;
+
+- Install Dependencies
 
 Install the required Python libraries:
 
