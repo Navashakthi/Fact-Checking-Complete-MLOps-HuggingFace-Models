@@ -27,7 +27,7 @@ cd Fact-Checking-Complete-MLOps-using-HuggingFace-Models
 
 Follow the implementation done in the notebook that includes the following steps;
 
-- Install Dependencies
+- **Install Dependencies**
 
 Install the required Python libraries:
 
@@ -35,7 +35,7 @@ Install the required Python libraries:
 pip install -r requirements.txt
 ```
 
-#### 3. Data Ingestion
+- **Data Ingestion**
 
 Download and load the dataset with `ingest.py`. This script fetches data for training and saves it in a specified directory.
 
@@ -43,7 +43,7 @@ Download and load the dataset with `ingest.py`. This script fetches data for tra
 python ingest.py
 ```
 
-#### 4. Data Preparation
+- **Data Preparation**
 
 Clean and preprocess the dataset by running `prepare.py`. This step applies data cleaning and tokenization, preparing it for model training.
 
@@ -51,7 +51,7 @@ Clean and preprocess the dataset by running `prepare.py`. This step applies data
 python prepare.py
 ```
 
-#### 5. Model Training
+- **Model Training**
 
 Train the model using `train.py`, which fine-tunes a Hugging Face transformer model on the dataset. You can adjust model and training parameters in the script as needed.
 
@@ -59,7 +59,7 @@ Train the model using `train.py`, which fine-tunes a Hugging Face transformer mo
 python train.py
 ```
 
-#### 6. Model Evaluation
+- **Model Evaluation**
 
 Evaluate the trained model on a test set using `evaluate.py`, which will output metrics like accuracy, F1-score, precision, and recall.
 
@@ -67,7 +67,7 @@ Evaluate the trained model on a test set using `evaluate.py`, which will output 
 python evaluate.py
 ```
 
-#### 7. Serve the Model with FastAPI
+- **Serve the Model with FastAPI**
 
 To deploy the model as a REST API, run `serve.py` using Uvicorn. This will launch a FastAPI application locally.
 
@@ -77,7 +77,7 @@ uvicorn serve:app --host 0.0.0.0 --port 8000
 
 Access the API at `http://localhost:8000`.
 
-#### 8. Deploy with Kubernetes
+- **Deploy with Kubernetes**
 
 To deploy the FastAPI service on Kubernetes, apply the configuration in `service.yaml`. Ensure that Kubernetes is set up and that `kubectl` is configured correctly.
 
