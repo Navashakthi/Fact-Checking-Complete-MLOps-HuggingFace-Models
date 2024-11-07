@@ -81,21 +81,9 @@ To deploy the FastAPI service on Kubernetes, apply the configuration in `service
 kubectl apply -f service.yaml
 ```
 
-### Sample API Request
+### Sample API Output
+![Screenshot 2024-11-07 at 7 58 37 PM](https://github.com/user-attachments/assets/fadfc0e6-76d4-4ee3-993c-154a05c7f89a)
 
-After deploying the API, you can test it with a sample request:
-
-```bash
-curl -X POST "http://localhost:8000/claim/v1/predict" -H "Content-Type: application/json" -d '{"text": "Vaccines do not cause autism."}'
-```
-
-Expected response:
-```json
-{
-  "claim": "Vaccines do not cause autism.",
-  "veracity": 1
-}
-```
 
 ### Folder Structure
 
