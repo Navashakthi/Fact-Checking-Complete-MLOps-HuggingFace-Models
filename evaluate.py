@@ -1,16 +1,22 @@
 # evaluate.py
-
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
-from datasets import load_dataset, Dataset
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from datasets import load_metric, Dataset
 import pandas as pd
-import numpy as np
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+from sklearn.model_selection import train_test_split
+
+# Load the fine-tuned model and tokenizer
+model_path = '/content/fine-tuned-model'
+model = AutoModelForSequenceClassification.from_pretrained(model_path)
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+
+# Load and preprocess the test data
+pubhealth_df = pd.read_csv('/content/processed_data/pubhealth_train.csv')
 
 def clean_text(text_list):
-    """Clean text by removing unwanted characters and handling non-string values."""
     cleaned_list = []
     for text in text_list:
-        if isinstance(text, float):  # Skip NaN or None values
+        if isinstance(text, float):
             continue
         if not isinstance(text, str):
             text = str(text)
@@ -18,68 +24,38 @@ def clean_text(text_list):
         cleaned_list.append(cleaned_text)
     return cleaned_list
 
-def apply_clean_text(df):
-    """Apply text cleaning to the 'cleaned_claim' column."""
-    df_cleaned = df.dropna(subset=['cleaned_claim']).copy()
-    df_cleaned['cleaned_claim'] = clean_text(df_cleaned['cleaned_claim'].tolist())
-    df.update(df_cleaned)
-    df = df.dropna(subset=['cleaned_claim'])
-    return df
+pubhealth_df['cleaned_claim'] = clean_text(pubhealth_df['cleaned_claim'].tolist())
+pubhealth_df.dropna(subset=['cleaned_claim', 'label'], inplace=True)
 
-def compute_metrics(pred):
-    """Compute accuracy, precision, recall, and F1-score for evaluation."""
-    labels = pred.label_ids
-    preds = np.argmax(pred.predictions, axis=1)
-    accuracy = accuracy_score(labels, preds)
-    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='weighted')
-    return {
-        'accuracy': accuracy,
-        'precision': precision,
-        'recall': recall,
-        'f1': f1
-    }
+# Split into train and test datasets
+_, test_df = train_test_split(pubhealth_df, test_size=0.2, random_state=42)
+test_dataset = Dataset.from_pandas(test_df)
 
-def main():
-    # Load the fine-tuned model and tokenizer
-    model_path = './fine-tuned-model'  # Path to the saved model
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForSequenceClassification.from_pretrained(model_path)
+# Tokenize the dataset
+def tokenize_function(texts):
+    return tokenizer(texts['cleaned_claim'], padding="max_length", truncation=True)
 
-    # Load the test dataset (assuming a similar format as the training set)
-    test_df = pd.read_csv('/content/processed_data/pubhealth_test.csv')
+test_dataset = test_dataset.map(tokenize_function, batched=True)
+test_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
+
+# Evaluation function
+def evaluate_model(model, dataset):
+    metric = load_metric("accuracy")
+    model.eval()
+    predictions, labels = [], []
+
+    with torch.no_grad():
+        for batch in dataset:
+            inputs = {key: batch[key].unsqueeze(0) for key in ["input_ids", "attention_mask"]}
+            outputs = model(**inputs)
+            logits = outputs.logits
+            predicted_class = torch.argmax(logits, dim=1).item()
+            predictions.append(predicted_class)
+            labels.append(batch['label'].item())
     
-    # Apply text cleaning to the test dataset
-    test_df = apply_clean_text(test_df)
+    accuracy = metric.compute(predictions=predictions, references=labels)['accuracy']
+    return accuracy
 
-    # Convert the test dataframe to a Hugging Face Dataset
-    test_dataset = Dataset.from_pandas(test_df)
-
-    # Tokenize the test dataset
-    def tokenize_function(examples):
-        return tokenizer(examples['cleaned_claim'], padding="max_length", truncation=True)
-
-    test_dataset = test_dataset.map(tokenize_function, batched=True)
-
-    # Set the format to PyTorch tensors
-    test_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
-
-    # Define training arguments (can reuse the ones from training)
-    training_args = TrainingArguments(
-        output_dir='./results',
-        per_device_eval_batch_size=16,
-    )
-
-    # Create Trainer instance
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        eval_dataset=test_dataset,
-        compute_metrics=compute_metrics
-    )
-
-    # Evaluate the model
-    results = trainer.evaluate()
-    print(results)
-
-if __name__ == "__main__":
-    main()
+# Calculate and print accuracy
+accuracy = evaluate_model(model, test_dataset)
+print(f"Model Accuracy: {accuracy * 100:.2f}%")
