@@ -1,35 +1,121 @@
-# Fact-Checking-Complete-MLOps-HuggingFace-Models
-Task of verifying the veracity of claims using hugging face models and kuberbetes deployment
+# Fact-Checking Model: Complete MLOps Pipeline with Hugging Face Models
 
-## Project Overview
+This repository implements a comprehensive MLOps pipeline for fact-checking claims using Hugging Face transformer models. The project includes data ingestion, preprocessing, model training, evaluation, and deployment as a FastAPI service. The deployment is set up to run in a Kubernetes environment, making it scalable and production-ready.
 
-The Fact-Checking Model pipeline includes the following key components:
+### Repository Overview
 
-1. **Data Ingestion** (`ingest.py`): Downloads and loads data for training.
-2. **Data Preparation** (`prepare.py`): Cleans and preprocesses the data for fine-tuning.
-3. **Model Training** (`train.py`): Fine-tunes a pretrained Hugging Face model on healthcare claim data.
-4. **Model Evaluation** (`evaluate.py`): Assesses model performance using metrics like accuracy, F1-score, precision, and recall.
-5. **Deployment** (`serve.py` and `service.yaml`): Deploys the model as a REST API with FastAPI and Kubernetes for scalable serving.
+The key components of the pipeline are as follows:
+- **`ingest.py`**: Downloads and loads the dataset.
+- **`prepare.py`**: Preprocesses data for model training.
+- **`train.py`**: Fine-tunes a pre-trained Hugging Face model for fact-checking.
+- **`evaluate.py`**: Evaluates the trained model on validation data.
+- **`serve.py`**: Deploys the model as a REST API with FastAPI.
+- **`service.yaml`**: Configures deployment with Kubernetes.
 
+### Getting Started
 
-## Repository Structure
+Follow these instructions to set up and run the project on your local environment.
 
-```plaintext
-├── ingest.py          # Data ingestion script
-├── prepare.py         # Data preprocessing script
-├── train.py           # Model fine-tuning script
-├── evaluate.py        # Model evaluation script
-├── serve.py           # FastAPI app for serving predictions
-├── service.yaml       # Kubernetes configuration file
-├── README.md          # Project documentation
-└── requirements.txt   # Required Python libraries
+#### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Navashakthi/Fact-Checking-Complete-MLOps-using-HuggingFace-Models.git
+cd Fact-Checking-Complete-MLOps-using-HuggingFace-Models
 ```
 
-## Contributing
+#### 2. Install Dependencies
 
-Contributions to enhance the functionality, add new models, or improve deployment strategies are welcome! Please fork this repository, make your changes, and create a pull request.
+Install the required Python libraries:
 
-## License
+```bash
+pip install -r requirements.txt
+```
+
+#### 3. Data Ingestion
+
+Download and load the dataset with `ingest.py`. This script fetches data for training and saves it in a specified directory.
+
+```bash
+python ingest.py
+```
+
+#### 4. Data Preparation
+
+Clean and preprocess the dataset by running `prepare.py`. This step applies data cleaning and tokenization, preparing it for model training.
+
+```bash
+python prepare.py
+```
+
+#### 5. Model Training
+
+Train the model using `train.py`, which fine-tunes a Hugging Face transformer model on the dataset. You can adjust model and training parameters in the script as needed.
+
+```bash
+python train.py
+```
+
+#### 6. Model Evaluation
+
+Evaluate the trained model on a test set using `evaluate.py`, which will output metrics like accuracy, F1-score, precision, and recall.
+
+```bash
+python evaluate.py
+```
+
+#### 7. Serve the Model with FastAPI
+
+To deploy the model as a REST API, run `serve.py` using Uvicorn. This will launch a FastAPI application locally.
+
+```bash
+uvicorn serve:app --host 0.0.0.0 --port 8000
+```
+
+Access the API at `http://localhost:8000`.
+
+#### 8. Deploy with Kubernetes
+
+To deploy the FastAPI service on Kubernetes, apply the configuration in `service.yaml`. Ensure that Kubernetes is set up and that `kubectl` is configured correctly.
+
+```bash
+kubectl apply -f service.yaml
+```
+
+### Sample API Request
+
+After deploying the API, you can test it with a sample request:
+
+```bash
+curl -X POST "http://localhost:8000/claim/v1/predict" -H "Content-Type: application/json" -d '{"text": "Vaccines do not cause autism."}'
+```
+
+Expected response:
+```json
+{
+  "claim": "Vaccines do not cause autism.",
+  "veracity": 1
+}
+```
+
+### Folder Structure
+
+```
+├── ingest.py             # Data ingestion script
+├── prepare.py            # Data preprocessing script
+├── train.py              # Model training and fine-tuning script
+├── evaluate.py           # Model evaluation script
+├── serve.py              # FastAPI service for serving predictions
+├── service.yaml          # Kubernetes configuration file for deployment
+├── requirements.txt      # Dependencies list
+└── README.md             # Documentation
+```
+
+### Notes
+
+- The model used in this pipeline is flexible; you can swap it for any other Hugging Face model suitable for fact-checking.
+- For deployment, ensure your Kubernetes environment has enough resources to handle the FastAPI service and model load.
+
+### License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
