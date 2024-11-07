@@ -110,10 +110,9 @@ Expected response:
 └── README.md             # Documentation
 ```
 
-### Notes
+### Monitoring
 
-- The model used in this pipeline is flexible; you can swap it for any other Hugging Face model suitable for fact-checking.
-- For deployment, ensure your Kubernetes environment has enough resources to handle the FastAPI service and model load.
+To monitor and update a fact-checking model, we can track performance metrics like accuracy, F1-score, precision, and recall on live data, watching for any declines that could indicate the need for retraining. Monitoring for data drift and concept drift would help detect changes in data patterns or the relationship between claims and veracity. A feedback loop for flagged errors would also help identify problematic predictions, and the model could be scheduled for periodic retraining or updates if performance falls below defined thresholds.
 
 ### License
 
