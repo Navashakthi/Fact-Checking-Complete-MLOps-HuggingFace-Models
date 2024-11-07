@@ -5,3 +5,5 @@ torch
 pydantic
 pytest
 httpx
+gradio
+nest_asyncio
