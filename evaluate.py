@@ -1,19 +1,12 @@
-# evaluate.py
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from datasets import load_metric, Dataset
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
+from datasets import load_dataset, Dataset
 import pandas as pd
-from sklearn.model_selection import train_test_split
-
-# Load the fine-tuned model and tokenizer
-model_path = '/content/fine-tuned-model'
-model = AutoModelForSequenceClassification.from_pretrained(model_path)
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-
-# Load and preprocess the test data
-pubhealth_df = pd.read_csv('/content/processed_data/pubhealth_train.csv')
+import numpy as np
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+import torch
 
 def clean_text(text_list):
+    """Clean text by removing unwanted characters and handling non-string values."""
     cleaned_list = []
     for text in text_list:
         if isinstance(text, float):
@@ -24,38 +17,56 @@ def clean_text(text_list):
         cleaned_list.append(cleaned_text)
     return cleaned_list
 
-pubhealth_df['cleaned_claim'] = clean_text(pubhealth_df['cleaned_claim'].tolist())
-pubhealth_df.dropna(subset=['cleaned_claim', 'label'], inplace=True)
+def apply_clean_text(df):
+    """Apply text cleaning to the 'cleaned_claim' column."""
+    df_cleaned = df.dropna(subset=['cleaned_claim']).copy()
+    df_cleaned['cleaned_claim'] = clean_text(df_cleaned['cleaned_claim'].tolist())
+    df.update(df_cleaned)
+    df = df.dropna(subset=['cleaned_claim'])
+    return df
 
-# Split into train and test datasets
-_, test_df = train_test_split(pubhealth_df, test_size=0.2, random_state=42)
-test_dataset = Dataset.from_pandas(test_df)
+def compute_metrics(pred):
+    labels = pred.label_ids
+    preds = np.argmax(pred.predictions, axis=1)
+    accuracy = accuracy_score(labels, preds)
+    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='weighted')
+    return {
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+        'f1': f1
+    }
 
-# Tokenize the dataset
-def tokenize_function(texts):
-    return tokenizer(texts['cleaned_claim'], padding="max_length", truncation=True)
+def main():
+    model_path = '/content/fine-tuned-model'
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModelForSequenceClassification.from_pretrained(model_path)
 
-test_dataset = test_dataset.map(tokenize_function, batched=True)
-test_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
+    test_df = pd.read_csv('/content/processed_data/pubhealth_test.csv')
+    test_df = apply_clean_text(test_df)
+    test_df = test_df[test_df['label'].isin([0, 1, 2, 3])]  # Ensure labels are in range
 
-# Evaluation function
-def evaluate_model(model, dataset):
-    metric = load_metric("accuracy")
-    model.eval()
-    predictions, labels = [], []
+    test_dataset = Dataset.from_pandas(test_df)
+    def tokenize_function(examples):
+        return tokenizer(examples['cleaned_claim'], padding="max_length", truncation=True, max_length=128)
 
-    with torch.no_grad():
-        for batch in dataset:
-            inputs = {key: batch[key].unsqueeze(0) for key in ["input_ids", "attention_mask"]}
-            outputs = model(**inputs)
-            logits = outputs.logits
-            predicted_class = torch.argmax(logits, dim=1).item()
-            predictions.append(predicted_class)
-            labels.append(batch['label'].item())
-    
-    accuracy = metric.compute(predictions=predictions, references=labels)['accuracy']
-    return accuracy
+    test_dataset = test_dataset.map(tokenize_function, batched=True)
+    test_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
 
-# Calculate and print accuracy
-accuracy = evaluate_model(model, test_dataset)
-print(f"Model Accuracy: {accuracy * 100:.2f}%")
+    training_args = TrainingArguments(
+        output_dir='./results',
+        per_device_eval_batch_size=16,
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        eval_dataset=test_dataset,
+        compute_metrics=compute_metrics
+    )
+
+    results = trainer.evaluate()
+    print(results)
+
+if __name__ == "__main__":
+    main()
